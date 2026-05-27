@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    root: WARN
+    ro.upt.pontaje: INFO
+    org.springframework.security: WARN
+
+app:
+  scheduler:
+    enabled: true

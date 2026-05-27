@@ -1,0 +1,12 @@
+# Build images (first time or after changes)
+docker-compose build
+
+# with no caches
+docker compose build --no-cache
+
+# Start all services (DB, backend, frontend)
+docker-compose up
+
+Backend: http://localhost:8081
+
+Interfata web: http://localhost:3000

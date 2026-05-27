@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: upt-pontaje-db
+    environment:
+      POSTGRES_DB: pontaje
+      POSTGRES_USER: pontaje_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pontaje_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pontaje_user -d pontaje"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pontaje-network
+
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: upt-pontaje-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:postgresql://postgres:5432/pontaje
+      DATABASE_USER: pontaje_user
+      DATABASE_PASSWORD: ${DB_PASSWORD:-pontaje_pass}
+      JWT_SECRET: ${JWT_SECRET:-bXlTdXBlclNlY3JldEtleUZvclByb2R1Y3Rpb24xMjM0NTY3ODkw}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+    volumes:
+      - documents_data:/app/documents
+      - maven_cache:/root/.m2
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pontaje-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: upt-pontaje-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - pontaje-network
+
+
+volumes:
+  postgres_data:
+  documents_data:
+  maven_cache:
+
+networks:
+  pontaje-network:
+    driver: bridge

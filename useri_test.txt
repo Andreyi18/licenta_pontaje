@@ -1,0 +1,3 @@
+Inserare utilizator admin: admin@upt.ro (parola: admin123)
+Inserare utilizator secretariat de test: secretariat@upt.ro (parola: secret123)
+Inserare cadru didactic de test: profesor@upt.ro (parola: test123)
