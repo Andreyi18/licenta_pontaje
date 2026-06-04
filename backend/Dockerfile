@@ -28,11 +28,11 @@ RUN mkdir -p /app/documents
 COPY --from=build /app/target/*.jar app.jar
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8081
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/api/health || exit 1
+  CMD curl -f http://localhost:8081/api/health || exit 1
 
 # Run application
 ENTRYPOINT ["java","-jar","app.jar"]

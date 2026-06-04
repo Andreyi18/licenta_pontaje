@@ -138,7 +138,7 @@ GET    /api/documents/{id}/download  # Descărcare PDF
 | Serviciu | Port | Descriere              |
 | -------- | ---- | ---------------------- |
 | postgres | 5432 | PostgreSQL 16 database |
-| backend  | 8080 | Spring Boot API        |
+| backend  | 8081 | Spring Boot API        |
 | frontend | 80   | Nginx + React SPA      |
 
 ### Comenzi
