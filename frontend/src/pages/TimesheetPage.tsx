@@ -33,6 +33,7 @@ import {
   CheckCircle as CheckIcon,
 } from "@mui/icons-material";
 import toast from "react-hot-toast";
+import ConfirmDialog from "../components/common/ConfirmDialog";
 import { timesheetsApi } from "../api/api";
 import {
   HourType,
@@ -102,6 +103,10 @@ const EntryDialog: React.FC<EntryDialogProps> = ({
   const [activity, setActivity] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmEntry, setConfirmEntry] = useState<TimesheetEntry | null>(null);
+
+  // intervalul selectat e deja pontat în ziua respectivă
+  const slotAlreadyLogged = existingEntries.some((e) => e.timeSlot === timeSlot);
 
   const handleAdd = async () => {
     setSaving(true);
@@ -117,6 +122,7 @@ const EntryDialog: React.FC<EntryDialogProps> = ({
     setDeletingId(entryId);
     try {
       await onDelete(entryId);
+      setConfirmEntry(null);
     } finally {
       setDeletingId(null);
     }
@@ -175,7 +181,7 @@ const EntryDialog: React.FC<EntryDialogProps> = ({
                   <IconButton
                     size="small"
                     color="error"
-                    onClick={() => handleDelete(entry.id)}
+                    onClick={() => setConfirmEntry(entry)}
                     disabled={deletingId === entry.id}
                   >
                     {deletingId === entry.id ? (
@@ -196,9 +202,9 @@ const EntryDialog: React.FC<EntryDialogProps> = ({
             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
               Adaugă oră
             </Typography>
-            {existingEntries.some((e) => e.timeSlot === timeSlot) && (
+            {slotAlreadyLogged && (
               <Alert severity="warning" sx={{ mb: 2 }}>
-                Intervalul <strong>{timeSlot}</strong> este deja înregistrat — salvarea va înlocui intrarea existentă.
+                Intervalul <strong>{timeSlot}</strong> este deja înregistrat — alege alt interval pentru a adăuga o oră.
               </Alert>
             )}
             <FormControl fullWidth sx={{ mb: 2 }}>
@@ -253,13 +259,30 @@ const EntryDialog: React.FC<EntryDialogProps> = ({
           <Button
             variant="contained"
             onClick={handleAdd}
-            disabled={saving}
+            disabled={saving || slotAlreadyLogged}
             startIcon={saving ? <CircularProgress size={16} /> : <AddIcon />}
           >
             Adaugă
           </Button>
         )}
       </DialogActions>
+
+      {/* confirmare stergere ora */}
+      <ConfirmDialog
+        open={!!confirmEntry}
+        title="Șterge ora?"
+        message={
+          <Typography>
+            Ești sigur că vrei să ștergi ora înregistrată pe intervalul{" "}
+            <strong>{confirmEntry?.timeSlot}</strong> (
+            {confirmEntry?.hourTypeDisplay})? Această acțiune nu poate fi anulată.
+          </Typography>
+        }
+        confirmLabel="Șterge"
+        loading={deletingId === confirmEntry?.id}
+        onConfirm={() => confirmEntry && handleDelete(confirmEntry.id)}
+        onClose={() => setConfirmEntry(null)}
+      />
     </Dialog>
   );
 };

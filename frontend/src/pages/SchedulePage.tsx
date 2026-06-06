@@ -34,6 +34,7 @@ import {
   CalendarMonth,
 } from "@mui/icons-material";
 import toast from "react-hot-toast";
+import ConfirmDialog from "../components/common/ConfirmDialog";
 import { schedulesApi } from "../api/api";
 import {
   DayOfWeek,
@@ -95,6 +96,12 @@ const ScheduleDialog: React.FC<ScheduleDialogProps> = ({
   const handleSave = async () => {
     if (!discipline.trim()) {
       toast.error("Disciplina este obligatorie");
+      return;
+    }
+    if (hasConflict) {
+      toast.error(
+        `Există deja o activitate la intervalul ${timeSlot} în această zi`,
+      );
       return;
     }
     setSaving(true);
@@ -190,7 +197,7 @@ const ScheduleDialog: React.FC<ScheduleDialogProps> = ({
         <Button
           variant="contained"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || hasConflict || !discipline.trim()}
           startIcon={saving ? <CircularProgress size={16} /> : undefined}
         >
           Salvează
@@ -207,6 +214,7 @@ const SchedulePage: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<Schedule | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const csvRef = useRef<HTMLInputElement>(null);
   const excelRef = useRef<HTMLInputElement>(null);
@@ -251,6 +259,7 @@ const SchedulePage: React.FC = () => {
     try {
       await schedulesApi.delete(id);
       setSchedules((prev) => prev.filter((s) => s.id !== id));
+      setConfirmDeleteItem(null);
       toast.success("Activitate ștearsă");
     } catch (err: any) {
       toast.error(err.message || "Eroare la ștergere");
@@ -468,7 +477,7 @@ const SchedulePage: React.FC = () => {
                             <IconButton
                               size="small"
                               color="error"
-                              onClick={() => handleDelete(schedule.id)}
+                              onClick={() => setConfirmDeleteItem(schedule)}
                               disabled={deletingId === schedule.id}
                             >
                               {deletingId === schedule.id ? (
@@ -506,6 +515,23 @@ const SchedulePage: React.FC = () => {
         existingSchedules={schedules}
         onClose={() => setDialogOpen(false)}
         onSave={handleSave}
+      />
+
+      {/* confirmare stergere activitate */}
+      <ConfirmDialog
+        open={!!confirmDeleteItem}
+        title="Șterge activitatea?"
+        message={
+          <Typography>
+            Ești sigur că vrei să ștergi activitatea{" "}
+            <strong>{confirmDeleteItem?.discipline}</strong> (
+            {confirmDeleteItem?.timeSlot})? Această acțiune nu poate fi anulată.
+          </Typography>
+        }
+        confirmLabel="Șterge"
+        loading={!!deletingId}
+        onConfirm={() => confirmDeleteItem && handleDelete(confirmDeleteItem.id)}
+        onClose={() => setConfirmDeleteItem(null)}
       />
 
       {/* confirmare stergere totala */}
