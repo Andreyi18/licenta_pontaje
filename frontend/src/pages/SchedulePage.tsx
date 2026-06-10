@@ -124,6 +124,11 @@ const ScheduleDialog: React.FC<ScheduleDialogProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{initial?.id ? "Editează activitate" : "Adaugă activitate"}</DialogTitle>
       <DialogContent dividers>
+        {!discipline.trim() && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Câmpuri obligatorii necompletate: <strong>Disciplină</strong>
+          </Alert>
+        )}
         {hasConflict && (
           <Alert severity="error" sx={{ mb: 2 }}>
             Există deja o activitate în <strong>{DAYS_OF_WEEK.find((d) => d.value === dayOfWeek)?.label}</strong> la intervalul <strong>{timeSlot}</strong>. Salvarea va fi blocată de server.

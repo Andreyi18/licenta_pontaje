@@ -52,6 +52,9 @@ app:
     deadline-day: 25
     reminder-days-before: 3
 
+  reports:
+    default-recipient: ${REPORT_DEFAULT_RECIPIENT:}
+
   documents:
     storage-path: ${DOCUMENTS_PATH:./documents}
 

@@ -121,12 +121,27 @@ const UserDialog: React.FC<UserDialogProps> = ({
     }
   };
 
+  // lista câmpurilor obligatorii încă necompletate
+  const missingFields = [
+    !firstName.trim() && "Prenume",
+    !lastName.trim() && "Nume",
+    !email.trim() && "Email",
+    !user && !password.trim() && "Parolă",
+  ].filter(Boolean) as string[];
+  const isValid = missingFields.length === 0;
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         {user ? "Editează utilizator" : "Adaugă utilizator nou"}
       </DialogTitle>
       <DialogContent dividers>
+        {missingFields.length > 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Câmpuri obligatorii necompletate:{" "}
+            <strong>{missingFields.join(", ")}</strong>
+          </Alert>
+        )}
         <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
           <TextField
             label="Prenume"
@@ -183,7 +198,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
         <Button
           variant="contained"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !isValid}
           startIcon={saving ? <CircularProgress size={16} /> : undefined}
         >
           Salvează

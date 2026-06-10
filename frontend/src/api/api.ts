@@ -315,6 +315,32 @@ export const secretariatApi = {
     if (!response.ok) throw new Error("Eroare la concatenare");
     return response.blob();
   },
+
+  getEmailConfig: (): Promise<{
+    configured: boolean;
+    defaultRecipient: string;
+  }> => {
+    return apiClient.get<{ configured: boolean; defaultRecipient: string }>(
+      "/secretariat/reports/email-config",
+    );
+  },
+
+  sendReport: (
+    month: number,
+    year: number,
+    payload: {
+      to: string[];
+      cc?: string[];
+      subject?: string;
+      body?: string;
+      departmentId?: string;
+    },
+  ): Promise<{ message: string; recipients: string }> => {
+    return apiClient.post<{ message: string; recipients: string }>(
+      `/secretariat/reports/send?month=${month}&year=${year}`,
+      payload,
+    );
+  },
 };
 
 // notifications api

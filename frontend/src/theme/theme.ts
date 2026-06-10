@@ -16,12 +16,12 @@ const uptColors = {
     contrastText: "#ffffff",
   },
   background: {
-    default: "#f5f7fa", // Light Gray Background
+    default: "#eef2f8", // Cool light gray-blue background
     paper: "#ffffff",
   },
   text: {
-    primary: "#1a1a1a",
-    secondary: "#666666",
+    primary: "#13233b", // Deep slate-navy for better contrast
+    secondary: "#5a6b80",
   },
   success: {
     main: "#28a745",
@@ -100,14 +100,14 @@ const themeOptions: ThemeOptions = {
     },
   },
   shape: {
-    borderRadius: 8,
+    borderRadius: 10,
   },
   shadows: [
     "none",
-    "0px 2px 4px rgba(0, 0, 0, 0.05)",
-    "0px 4px 8px rgba(0, 0, 0, 0.08)",
-    "0px 8px 16px rgba(0, 0, 0, 0.10)",
-    "0px 12px 24px rgba(0, 0, 0, 0.12)",
+    "0px 1px 3px rgba(15, 35, 65, 0.06), 0px 1px 2px rgba(15, 35, 65, 0.04)",
+    "0px 4px 12px rgba(15, 35, 65, 0.07), 0px 2px 4px rgba(15, 35, 65, 0.04)",
+    "0px 8px 20px rgba(15, 35, 65, 0.09), 0px 3px 6px rgba(15, 35, 65, 0.05)",
+    "0px 12px 28px rgba(15, 35, 65, 0.11), 0px 4px 8px rgba(15, 35, 65, 0.06)",
     "0px 16px 32px rgba(0, 0, 0, 0.14)",
     "0px 20px 40px rgba(0, 0, 0, 0.16)",
     "0px 24px 48px rgba(0, 0, 0, 0.18)",
@@ -179,12 +179,14 @@ const themeOptions: ThemeOptions = {
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
-          boxShadow: "0px 4px 16px rgba(0, 0, 0, 0.08)",
-          border: "1px solid rgba(0, 0, 0, 0.06)",
-          transition: "box-shadow 0.3s ease, transform 0.2s ease",
+          borderRadius: 14,
+          boxShadow: "0px 4px 16px rgba(15, 35, 65, 0.06)",
+          border: "1px solid rgba(15, 35, 65, 0.07)",
+          transition:
+            "box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease",
           "&:hover": {
-            boxShadow: "0px 8px 24px rgba(0, 0, 0, 0.12)",
+            boxShadow: "0px 12px 28px rgba(15, 35, 65, 0.12)",
+            borderColor: "rgba(0, 102, 204, 0.18)",
           },
         },
       },
@@ -205,15 +207,33 @@ const themeOptions: ThemeOptions = {
     MuiAppBar: {
       styleOverrides: {
         root: {
-          boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.08)",
+          boxShadow: "none",
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid rgba(15, 35, 65, 0.08)",
         },
       },
     },
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          borderRight: "none",
-          boxShadow: "2px 0px 8px rgba(0, 0, 0, 0.08)",
+          borderRight: "1px solid rgba(15, 35, 65, 0.07)",
+          boxShadow: "none",
+        },
+      },
+    },
+    MuiTooltip: {
+      styleOverrides: {
+        tooltip: {
+          backgroundColor: "rgba(19, 35, 59, 0.92)",
+          borderRadius: 8,
+          fontSize: "0.75rem",
+          fontWeight: 500,
+          padding: "6px 10px",
+        },
+        arrow: {
+          color: "rgba(19, 35, 59, 0.92)",
         },
       },
     },
@@ -235,10 +255,13 @@ const themeOptions: ThemeOptions = {
     MuiTableHead: {
       styleOverrides: {
         root: {
-          backgroundColor: uptColors.background.default,
+          background: "linear-gradient(180deg, #f3f6fb 0%, #e9eef6 100%)",
           "& .MuiTableCell-head": {
-            fontWeight: 600,
-            color: uptColors.text.primary,
+            fontWeight: 700,
+            fontSize: "0.78rem",
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: uptColors.text.secondary,
           },
         },
       },
@@ -246,8 +269,9 @@ const themeOptions: ThemeOptions = {
     MuiTableRow: {
       styleOverrides: {
         root: {
+          transition: "background-color 0.15s ease",
           "&:hover": {
-            backgroundColor: "rgba(0, 102, 204, 0.04)",
+            backgroundColor: "rgba(0, 102, 204, 0.045)",
           },
         },
       },
@@ -255,8 +279,17 @@ const themeOptions: ThemeOptions = {
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 6,
-          fontWeight: 500,
+          borderRadius: 8,
+          fontWeight: 600,
+          letterSpacing: "0.01em",
+        },
+      },
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 10,
+          transition: "background-color 0.18s ease, color 0.18s ease",
         },
       },
     },

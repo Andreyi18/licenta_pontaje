@@ -37,6 +37,7 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      REPORT_DEFAULT_RECIPIENT: ${REPORT_DEFAULT_RECIPIENT:-}
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173
     volumes:
       - documents_data:/app/documents

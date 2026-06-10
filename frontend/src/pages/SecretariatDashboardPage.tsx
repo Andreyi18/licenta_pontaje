@@ -32,11 +32,13 @@ import {
   Download as DownloadIcon,
   Refresh as RefreshIcon,
   Groups as UsersIcon,
-  Visibility as ViewIcon
+  Visibility as ViewIcon,
+  Email as EmailIcon
 } from "@mui/icons-material";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { secretariatApi } from "../api/api";
+import SendReportDialog from "../components/secretariat/SendReportDialog";
 import type { Timesheet } from "../types";
 import { TimesheetStatus, MONTHS } from "../types";
 
@@ -51,8 +53,11 @@ const SecretariatDashboardPage: React.FC = () => {
   const [stats, setStats] = useState({ total: 0, draft: 0, submitted: 0, approved: 0, missing: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const hasReportData = stats.approved > 0 || stats.submitted > 0;
 
   // Load Data
   useEffect(() => {
@@ -135,17 +140,35 @@ const SecretariatDashboardPage: React.FC = () => {
             </IconButton>
           </Tooltip>
           
-          <Button 
-            variant="contained" 
-            color="primary" 
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<EmailIcon />}
+            onClick={() => setSendDialogOpen(true)}
+            disabled={!hasReportData}
+          >
+            Trimite pe email
+          </Button>
+
+          <Button
+            variant="contained"
+            color="primary"
             startIcon={isMerging ? <CircularProgress size={20} color="inherit" /> : <DownloadIcon />}
             onClick={handleMergeDocuments}
-            disabled={isMerging || (stats.approved === 0 && stats.submitted === 0)}
+            disabled={isMerging || !hasReportData}
           >
             {isMerging ? "Se generează..." : "Descarcă Centralizator PDF"}
           </Button>
         </Box>
       </Box>
+
+      {/* dialog trimitere raport pe email */}
+      <SendReportDialog
+        open={sendDialogOpen}
+        month={selectedMonth}
+        year={selectedYear}
+        onClose={() => setSendDialogOpen(false)}
+      />
 
       {/* Filters */}
       <Card sx={{ mb: 4, boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>

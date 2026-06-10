@@ -40,6 +40,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { UserRole, type AppNotification } from "../../types";
 import { notificationsApi } from "../../api/api";
+import AssistantWidget from "../common/AssistantWidget";
 
 const DRAWER_WIDTH = 260;
 
@@ -221,12 +222,26 @@ const MainLayout: React.FC = () => {
               selected={location.pathname === item.path}
               sx={{
                 borderRadius: 2,
+                position: "relative",
                 "&.Mui-selected": {
-                  backgroundColor: "primary.main",
+                  background:
+                    "linear-gradient(135deg, #003366 0%, #0066cc 100%)",
                   color: "white",
+                  boxShadow: "0 6px 16px rgba(0, 51, 102, 0.28)",
                   "& .MuiListItemIcon-root": { color: "white" },
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    left: 0,
+                    top: "20%",
+                    bottom: "20%",
+                    width: 4,
+                    borderRadius: 4,
+                    backgroundColor: "#ffffff",
+                  },
                   "&:hover": {
-                    backgroundColor: "primary.dark",
+                    background:
+                      "linear-gradient(135deg, #002244 0%, #004d99 100%)",
                   },
                 },
                 "&:hover": {
@@ -492,6 +507,9 @@ const MainLayout: React.FC = () => {
       >
         <Outlet />
       </Box>
+
+      {/* asistent flotant (jos-dreapta) */}
+      <AssistantWidget />
     </Box>
   );
 };
