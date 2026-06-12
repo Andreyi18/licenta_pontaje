@@ -1,9 +1,16 @@
-import React from "react";
+import React, { createContext, useMemo, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import theme from "./theme/theme";
+import { theme, darkTheme } from "./theme/theme";
+
+// context pentru comutarea temei light/dark
+type ColorMode = "light" | "dark";
+export const ColorModeContext = createContext<{
+  mode: ColorMode;
+  toggle: () => void;
+}>({ mode: "light", toggle: () => {} });
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import MainLayout from "./components/layout/MainLayout";
@@ -33,9 +40,29 @@ const queryClient = new QueryClient({
 });
 
 const App: React.FC = () => {
+  const [mode, setMode] = useState<ColorMode>(
+    () => (localStorage.getItem("colorMode") as ColorMode) || "light",
+  );
+
+  const colorMode = useMemo(
+    () => ({
+      mode,
+      toggle: () =>
+        setMode((prev) => {
+          const next = prev === "light" ? "dark" : "light";
+          localStorage.setItem("colorMode", next);
+          return next;
+        }),
+    }),
+    [mode],
+  );
+
+  const activeTheme = mode === "dark" ? darkTheme : theme;
+
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
+      <ColorModeContext.Provider value={colorMode}>
+      <ThemeProvider theme={activeTheme}>
         <CssBaseline />
         <AuthProvider>
           <BrowserRouter>
@@ -123,6 +150,7 @@ const App: React.FC = () => {
           </BrowserRouter>
         </AuthProvider>
       </ThemeProvider>
+      </ColorModeContext.Provider>
     </QueryClientProvider>
   );
 };

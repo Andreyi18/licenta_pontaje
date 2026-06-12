@@ -247,10 +247,20 @@ const DocumentsPage: React.FC = () => {
                 <Box
                   sx={{
                     p: 3,
-                    border: "2px solid",
+                    border: "1.5px solid",
                     borderColor: hasAnexa1 ? "success.main" : "grey.200",
-                    borderRadius: 2,
+                    borderRadius: 3,
                     textAlign: "center",
+                    height: "100%",
+                    background: hasAnexa1
+                      ? "linear-gradient(180deg, rgba(40,167,69,0.06) 0%, rgba(40,167,69,0) 100%)"
+                      : "transparent",
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
+                    "&:hover": {
+                      borderColor: hasAnexa1 ? "success.dark" : "primary.light",
+                      boxShadow: "0 8px 20px rgba(15,35,65,0.08)",
+                      transform: "translateY(-2px)",
+                    },
                   }}
                 >
                   <PdfIcon
@@ -289,10 +299,20 @@ const DocumentsPage: React.FC = () => {
                 <Box
                   sx={{
                     p: 3,
-                    border: "2px solid",
+                    border: "1.5px solid",
                     borderColor: hasAnexa3 ? "success.main" : "grey.200",
-                    borderRadius: 2,
+                    borderRadius: 3,
                     textAlign: "center",
+                    height: "100%",
+                    background: hasAnexa3
+                      ? "linear-gradient(180deg, rgba(40,167,69,0.06) 0%, rgba(40,167,69,0) 100%)"
+                      : "transparent",
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
+                    "&:hover": {
+                      borderColor: hasAnexa3 ? "success.dark" : "primary.light",
+                      boxShadow: "0 8px 20px rgba(15,35,65,0.08)",
+                      transform: "translateY(-2px)",
+                    },
                   }}
                 >
                   <PdfIcon

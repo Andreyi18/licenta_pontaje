@@ -313,25 +313,110 @@ const themeOptions: ThemeOptions = {
 // Create theme
 export const theme = createTheme(themeOptions);
 
-// Dark theme variant
+// Dark theme variant — culori adaptate pentru contrast pe fundal întunecat
 export const darkTheme = createTheme({
   ...themeOptions,
   palette: {
     mode: "dark",
-    primary: uptColors.primary,
-    secondary: uptColors.secondary,
+    primary: {
+      main: "#4d94ff", // albastru mai deschis ca să iasă în evidență pe întuneric
+      light: "#7db4ff",
+      dark: "#0066cc",
+      contrastText: "#0a1929",
+    },
+    secondary: {
+      main: "#3399ff",
+      light: "#66b2ff",
+      dark: "#004d99",
+      contrastText: "#ffffff",
+    },
     background: {
-      default: "#121212",
-      paper: "#1e1e1e",
+      default: "#0d1726", // navy profund
+      paper: "#152238",
     },
     text: {
-      primary: "#ffffff",
-      secondary: "#b0b0b0",
+      primary: "#e7edf5",
+      secondary: "#9fb0c3",
     },
+    divider: "rgba(255,255,255,0.10)",
     success: uptColors.success,
     warning: uptColors.warning,
     error: uptColors.error,
     info: uptColors.info,
+  },
+  components: {
+    ...themeOptions.components,
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: "#0d1726",
+          scrollbarColor: "#33425c #0d1726",
+          "&::-webkit-scrollbar-track": { background: "#0d1726" },
+          "&::-webkit-scrollbar-thumb": {
+            background: "#33425c",
+            borderRadius: "5px",
+          },
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          boxShadow: "none",
+          backgroundColor: "rgba(21, 34, 56, 0.85)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          color: "#e7edf5",
+        },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: "#0f1b2e",
+          borderRight: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "none",
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 14,
+          backgroundColor: "#152238",
+          border: "1px solid rgba(255,255,255,0.07)",
+          boxShadow: "0px 4px 16px rgba(0,0,0,0.35)",
+          transition: "box-shadow 0.25s ease, border-color 0.25s ease",
+          "&:hover": {
+            boxShadow: "0px 12px 28px rgba(0,0,0,0.5)",
+            borderColor: "rgba(77,148,255,0.35)",
+          },
+        },
+      },
+    },
+    MuiTableHead: {
+      styleOverrides: {
+        root: {
+          background: "linear-gradient(180deg, #1b2a44 0%, #152238 100%)",
+          "& .MuiTableCell-head": {
+            fontWeight: 700,
+            fontSize: "0.78rem",
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: "#9fb0c3",
+          },
+        },
+      },
+    },
+    MuiTableRow: {
+      styleOverrides: {
+        root: {
+          transition: "background-color 0.15s ease",
+          "&:hover": { backgroundColor: "rgba(77,148,255,0.08)" },
+        },
+      },
+    },
   },
 });
 

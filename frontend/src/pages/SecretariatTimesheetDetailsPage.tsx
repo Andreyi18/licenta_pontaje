@@ -18,6 +18,8 @@ import {
   Breadcrumbs,
   Link as MUILink,
   Button,
+  Avatar,
+  Divider,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
@@ -182,25 +184,77 @@ const SecretariatTimesheetDetailsPage: React.FC = () => {
         <>
           <Card sx={{ mb: 3 }}>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                {timesheet.userName} ({timesheet.userEmail})
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Departament: {timesheet.departmentName || "Nespecificat"}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Perioada: {timesheet.periodDisplay}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Total ore normă: {timesheet.totalNormaHours} h
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Total ore plată cu ora: {timesheet.totalPlataOraHours} h
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Total: {timesheet.totalHours} h
-              </Typography>
-              <Box sx={{ mt: 1 }}>{getStatusChip(timesheet.status)}</Box>
+              {/* antet cadru didactic */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 2,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar
+                    sx={{
+                      width: 52,
+                      height: 52,
+                      bgcolor: "primary.main",
+                      fontSize: "1.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {timesheet.userName?.charAt(0) || "U"}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+                      {timesheet.userName}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {timesheet.userEmail}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {timesheet.departmentName || "Departament nespecificat"} ·{" "}
+                      {timesheet.periodDisplay}
+                    </Typography>
+                  </Box>
+                </Box>
+                {getStatusChip(timesheet.status)}
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* dale statistici */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                  gap: 2,
+                }}
+              >
+                {[
+                  { label: "Ore normă", value: timesheet.totalNormaHours, color: "#28a745" },
+                  { label: "Ore plată cu ora", value: timesheet.totalPlataOraHours, color: "#0066cc" },
+                  { label: "Total ore", value: timesheet.totalHours, color: "#003366" },
+                ].map((s) => (
+                  <Box
+                    key={s.label}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      backgroundColor: "grey.50",
+                      borderLeft: `4px solid ${s.color}`,
+                    }}
+                  >
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: s.color }}>
+                      {s.value} h
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {s.label}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
             </CardContent>
           </Card>
 

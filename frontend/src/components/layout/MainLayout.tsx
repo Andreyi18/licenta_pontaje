@@ -22,6 +22,7 @@ import {
   Popover,
   Button,
   Chip,
+  Tooltip,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -36,11 +37,15 @@ import {
   AccountCircle as AccountIcon,
   ChevronLeft as ChevronLeftIcon,
   DoneAll as DoneAllIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon,
 } from "@mui/icons-material";
+import { useContext } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { UserRole, type AppNotification } from "../../types";
 import { notificationsApi } from "../../api/api";
 import AssistantWidget from "../common/AssistantWidget";
+import { ColorModeContext } from "../../App";
 
 const DRAWER_WIDTH = 260;
 
@@ -95,6 +100,7 @@ const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasRole } = useAuth();
+  const colorMode = useContext(ColorModeContext);
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -282,7 +288,7 @@ const MainLayout: React.FC = () => {
             gap: 1.5,
             p: 1.5,
             borderRadius: 2,
-            backgroundColor: "grey.100",
+            backgroundColor: "action.hover",
           }}
         >
           <Avatar sx={{ bgcolor: "primary.main", width: 36, height: 36 }}>
@@ -314,7 +320,6 @@ const MainLayout: React.FC = () => {
         sx={{
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           ml: { md: `${DRAWER_WIDTH}px` },
-          backgroundColor: "white",
           color: "text.primary",
         }}
       >
@@ -329,6 +334,13 @@ const MainLayout: React.FC = () => {
           </IconButton>
 
           <Box sx={{ flexGrow: 1 }} />
+
+          {/* comutare temă light/dark */}
+          <Tooltip title={colorMode.mode === "dark" ? "Mod luminos" : "Mod întunecat"}>
+            <IconButton color="inherit" sx={{ mr: 0.5 }} onClick={colorMode.toggle}>
+              {colorMode.mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+          </Tooltip>
 
           {/* notificari */}
           <IconButton color="inherit" sx={{ mr: 1 }} onClick={handleNotifOpen}>
@@ -505,7 +517,21 @@ const MainLayout: React.FC = () => {
           minHeight: "calc(100vh - 64px)",
         }}
       >
-        <Outlet />
+        {/* animatie de intrare la fiecare navigare */}
+        <Box
+          key={location.pathname}
+          sx={{
+            "@media (prefers-reduced-motion: no-preference)": {
+              animation: "pageEnter 0.35s ease-out",
+            },
+            "@keyframes pageEnter": {
+              "0%": { opacity: 0, transform: "translateY(8px)" },
+              "100%": { opacity: 1, transform: "translateY(0)" },
+            },
+          }}
+        >
+          <Outlet />
+        </Box>
       </Box>
 
       {/* asistent flotant (jos-dreapta) */}

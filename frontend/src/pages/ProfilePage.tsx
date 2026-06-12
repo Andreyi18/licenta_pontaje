@@ -8,12 +8,11 @@ import {
   TextField,
   Button,
   Divider,
-  Card,
-  CardContent,
   IconButton,
   Alert,
   Snackbar,
   CircularProgress,
+  Chip,
 } from "@mui/material";
 import {
   Email as EmailIcon,
@@ -27,6 +26,12 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { authApi } from "../api/api";
 import type { ProfileUpdateRequest, User } from "../types";
+
+const roleLabels: Record<string, string> = {
+  CADRU_DIDACTIC: "Cadru didactic",
+  SECRETARIAT: "Secretariat",
+  ADMIN: "Administrator",
+};
 
 const ProfilePage: React.FC = () => {
   const { user, updateUser } = useAuth();
@@ -134,36 +139,50 @@ const ProfilePage: React.FC = () => {
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper
             sx={{
-              p: 4,
               textAlign: "center",
               height: "100%",
-              background: "linear-gradient(135deg, #ffffff 0%, #f8faff 100%)",
+              overflow: "hidden",
               border: "1px solid rgba(0, 51, 102, 0.08)",
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.04)",
+              boxShadow: "0 8px 32px rgba(15, 35, 65, 0.06)",
             }}
           >
-            <Avatar
+            {/* banner gradient */}
+            <Box
               sx={{
-                width: 120,
-                height: 120,
-                fontSize: "3rem",
-                bgcolor: "primary.main",
-                mx: "auto",
-                mb: 2,
-                boxShadow: "0 4px 12px rgba(0, 51, 102, 0.2)",
+                height: 96,
+                background:
+                  "linear-gradient(135deg, #003366 0%, #0066cc 100%)",
               }}
-            >
-              {user?.firstName?.charAt(0)}
-              {user?.lastName?.charAt(0)}
-            </Avatar>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              {user?.fullName}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              {user?.role}
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            <Box sx={{ textAlign: "left", mt: 2 }}>
+            />
+            <Box sx={{ px: 4, pb: 4, mt: "-56px" }}>
+              <Avatar
+                sx={{
+                  width: 112,
+                  height: 112,
+                  fontSize: "2.75rem",
+                  bgcolor: "primary.main",
+                  mx: "auto",
+                  mb: 2,
+                  border: "4px solid #fff",
+                  boxShadow: "0 6px 16px rgba(0, 51, 102, 0.25)",
+                }}
+              >
+                {user?.firstName?.charAt(0)}
+                {user?.lastName?.charAt(0)}
+              </Avatar>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                {user?.fullName}
+              </Typography>
+              <Box sx={{ mt: 1, mb: 1 }}>
+                <Chip
+                  label={roleLabels[user?.role ?? ""] || user?.role}
+                  color="primary"
+                  size="small"
+                  variant="outlined"
+                />
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Box sx={{ textAlign: "left", mt: 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
                 <EmailIcon fontSize="small" color="primary" sx={{ mr: 2 }} />
                 <Typography variant="body2">{user?.email}</Typography>
@@ -173,6 +192,7 @@ const ProfilePage: React.FC = () => {
                 <Typography variant="body2">
                   {user?.departmentName || "Departament Nesetat"}
                 </Typography>
+              </Box>
               </Box>
             </Box>
           </Paper>

@@ -1,14 +1,14 @@
 package ro.upt.pontaje.service;
 
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.IOUtils;
+import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
-import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
@@ -20,18 +20,21 @@ import ro.upt.pontaje.model.*;
 import ro.upt.pontaje.model.Document;
 import ro.upt.pontaje.repository.DocumentRepository;
 
+import java.awt.Color;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
 
 /**
- * Serviciu pentru generarea documentelor PDF (Anexa 1, Anexa 3, pontaje)
+ * Serviciu pentru generarea documentelor PDF (Anexa 1 / Anexa 3) în formatul oficial UPT:
+ * fișă săptămânală de evidență a orelor (ore x zile), cu legendă, totaluri și semnături.
  */
 @Service
 public class PdfGeneratorService {
@@ -46,142 +49,369 @@ public class PdfGeneratorService {
     @Value("${app.documents.storage-path}")
     private String storagePath;
 
-    // Configurări PDF
-    private static final float MARGIN = 50;
-    private static final float HEADER_HEIGHT = 80;
-    private static final float ROW_HEIGHT = 20;
-    private static final float CELL_PADDING = 5;
+    // ---- Stil / culori ----
+    private static final Color UPT_BLUE = new Color(0x00, 0x33, 0x66);
+    private static final Color UPT_BLUE_LIGHT = new Color(0x00, 0x66, 0xCC);
+    private static final Color HEADER_FILL = new Color(0xE9, 0xEE, 0xF6);
+    private static final Color TOTAL_FILL = new Color(0xDF, 0xE7, 0xF2);
+    private static final Color GRID = new Color(0x9A, 0xA8, 0xBC);
+    private static final Color NORMA_FILL = new Color(0xE3, 0xF6, 0xE8);
+    private static final Color PLATA_FILL = new Color(0xFD, 0xEC, 0xDD);
+    private static final Color NORMA_TXT = new Color(0x1E, 0x7E, 0x34);
+    private static final Color PLATA_TXT = new Color(0xB2, 0x5A, 0x12);
+    private static final Color MUTED = new Color(0x9A, 0xA8, 0xBC);
 
-    // Intervale orare standard
-    private static final String[] TIME_SLOTS = {
-        "08:00-09:00", "09:00-10:00", "10:00-11:00", "11:00-12:00",
-        "12:00-13:00", "13:00-14:00", "14:00-15:00", "15:00-16:00",
-        "16:00-17:00", "17:00-18:00", "18:00-19:00", "19:00-20:00",
-        "20:00-21:00", "21:00-22:00"
-    };
+    private static final float MARGIN = 28f;
+    private static final DateTimeFormatter D_DMY = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    private static final DateTimeFormatter D_DM = DateTimeFormatter.ofPattern("dd.MM");
 
-    // Zile săptămână
-    private static final String[] DAYS = {"Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"};
+    private static final String[] MONTHS_RO = {"", "ianuarie", "februarie", "martie", "aprilie", "mai", "iunie",
+            "iulie", "august", "septembrie", "octombrie", "noiembrie", "decembrie"};
+    private static final String[] DAY_NAMES_RO = {"Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"};
+
+    // Intervalele orare (rândurile fișei): 08-09 ... 21-22
+    private static final int FIRST_HOUR = 8;
+    private static final int LAST_HOUR = 22;
 
     /**
-     * Generează PDF pentru Anexa 1 sau Anexa 3
+     * Generează PDF pentru Anexa 1 / Anexa 3 în format de fișă săptămânală (o pagină per săptămână).
      */
     @Transactional
     public Document generateAnnex(Timesheet timesheet, AnnexType annexType) throws IOException {
         User user = timesheet.getUser();
-        
-        // Creează directorul pentru documente dacă nu există
+
         Path storageDir = Paths.get(storagePath);
         if (!Files.exists(storageDir)) {
             Files.createDirectories(storageDir);
         }
 
-        // Generează numele fișierului
         String fileName = String.format("%s_%s_%s_%d_%d.pdf",
-            annexType.name().toLowerCase(),
-            user.getLastName().toLowerCase().replaceAll("\\s+", "_"),
-            user.getFirstName().toLowerCase().replaceAll("\\s+", "_"),
-            timesheet.getMonth(),
-            timesheet.getYear());
-        
+                annexType.name().toLowerCase(),
+                safe(user.getLastName()),
+                safe(user.getFirstName()),
+                timesheet.getMonth(),
+                timesheet.getYear());
+
         String filePath = Paths.get(storagePath, fileName).toString();
 
-        // Generează PDF-ul
         try (PDDocument document = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.A4);
-            document.addPage(page);
+            PDType0Font fontRegular = PDType0Font.load(document,
+                    new ClassPathResource("fonts/DejaVuSans.ttf").getInputStream(), true);
+            PDType0Font fontBold = PDType0Font.load(document,
+                    new ClassPathResource("fonts/DejaVuSans-Bold.ttf").getInputStream(), true);
 
-            try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
-                PDType1Font fontBold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
-                PDType1Font fontRegular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
-
-                float pageWidth = page.getMediaBox().getWidth();
-                float pageHeight = page.getMediaBox().getHeight();
-                float currentY = pageHeight - MARGIN;
-
-                // Header - Logo și informații UPT
-                currentY = drawHeader(contentStream, fontBold, fontRegular, pageWidth, currentY);
-
-                // Titlu anexă
-                currentY = drawTitle(contentStream, fontBold, annexType, pageWidth, currentY);
-
-                // Informații utilizator
-                currentY = drawUserInfo(contentStream, fontRegular, user, timesheet, pageWidth, currentY);
-
-                // Tabel cu ore
-                currentY = drawTimesheetTable(contentStream, fontBold, fontRegular, 
-                    timesheet, pageWidth, currentY);
-
-                // Footer cu totale
-                drawFooter(contentStream, fontBold, fontRegular, timesheet, pageWidth, currentY);
+            String departmentName = "—";
+            if (user.getDepartment() != null && Hibernate.isInitialized(user.getDepartment())) {
+                departmentName = user.getDepartment().getName();
             }
 
-            // Salvează documentul
+            // Indexăm intrările după dată
+            Map<LocalDate, List<TimesheetEntry>> byDate = new HashMap<>();
+            for (TimesheetEntry e : timesheet.getEntries()) {
+                byDate.computeIfAbsent(e.getEntryDate(), k -> new ArrayList<>()).add(e);
+            }
+
+            // Calculăm săptămânile (Luni→Duminică) care acoperă luna
+            LocalDate first = LocalDate.of(timesheet.getYear(), timesheet.getMonth(), 1);
+            LocalDate last = first.withDayOfMonth(first.lengthOfMonth());
+            LocalDate weekStart = first.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+            int weekIndex = 1;
+            while (!weekStart.isAfter(last)) {
+                PDPage page = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth())); // landscape
+                document.addPage(page);
+                try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
+                    drawWeekSheet(cs, fontRegular, fontBold, page, annexType, user, departmentName,
+                            timesheet, byDate, weekStart, weekIndex);
+                }
+                weekStart = weekStart.plusWeeks(1);
+                weekIndex++;
+            }
+
             document.save(filePath);
         }
 
-        // Salvează înregistrarea în baza de date
         Document doc = Document.builder()
-            .user(user)
-            .timesheet(timesheet)
-            .annexType(annexType)
-            .filePath(filePath)
-            .fileName(fileName)
-            .build();
+                .user(user)
+                .timesheet(timesheet)
+                .annexType(annexType)
+                .filePath(filePath)
+                .fileName(fileName)
+                .build();
 
         return documentRepository.save(doc);
     }
 
-    /**
-     * Concatenează mai multe PDF-uri într-unul singur (pentru secretariat)
-     */
+    // ====================== DESENARE FIȘĂ SĂPTĂMÂNALĂ ======================
+
+    private void drawWeekSheet(PDPageContentStream cs, PDFont fr, PDFont fb, PDPage page,
+                               AnnexType annexType, User user, String departmentName, Timesheet timesheet,
+                               Map<LocalDate, List<TimesheetEntry>> byDate,
+                               LocalDate weekStart, int weekIndex) throws IOException {
+        float pageW = page.getMediaBox().getWidth();
+        float pageH = page.getMediaBox().getHeight();
+        float left = MARGIN;
+        float right = pageW - MARGIN;
+        float y = pageH - MARGIN;
+
+        // --- Antet instituțional ---
+        text(cs, fb, 12, UPT_BLUE, left, y - 10, "Universitatea Politehnica Timișoara");
+        textRight(cs, fb, 12, UPT_BLUE, right, y - 10, annexType.getDisplayName());
+        text(cs, fr, 9.5f, Color.DARK_GRAY, left, y - 26, "Departamentul " + departmentName);
+
+        cs.setStrokingColor(UPT_BLUE_LIGHT);
+        cs.setLineWidth(1.4f);
+        cs.moveTo(left, y - 33);
+        cs.lineTo(right, y - 33);
+        cs.stroke();
+
+        // --- Titlu centrat ---
+        float titleY = y - 52;
+        String title = annexType == AnnexType.ANEXA_1
+                ? "EVIDENȚA NUMĂRULUI DE ORE LUCRATE DE CĂTRE CADRELE DIDACTICE"
+                : "EVIDENȚA NUMĂRULUI DE ORE DE CONDUCERE DOCTORAT";
+        textCenter(cs, fb, 11, UPT_BLUE, left, right, titleY, title);
+        if (annexType == AnnexType.ANEXA_1) {
+            textCenter(cs, fb, 11, UPT_BLUE, left, right, titleY - 14,
+                    "TITULARE SAU CU CONTRACT DE MUNCĂ PE DURATĂ DETERMINATĂ");
+        }
+
+        // --- Sub-antet: perioadă / cadru ---
+        LocalDate weekEnd = weekStart.plusDays(6);
+        String period = String.format("Luna %s %d  ·  Săptămâna %d  ·  %s – %s",
+                MONTHS_RO[timesheet.getMonth()], timesheet.getYear(), weekIndex,
+                weekStart.format(D_DMY), weekEnd.format(D_DMY));
+        textCenter(cs, fr, 9.5f, Color.DARK_GRAY, left, right, titleY - 30, period);
+
+        // ====== TABEL ======
+        float tableTop = titleY - 46;
+        float wProgram = 64f;          // "Program de lucru"
+        float wSign = 92f;             // "Semnătură cadru didactic"
+        float wDays = (right - left) - wProgram - wSign;
+        float wDay = wDays / 7f;
+        float headH = 28f;
+        float rowH = 18f;
+        int hourRows = LAST_HOUR - FIRST_HOUR; // 14
+
+        // --- Antet tabel ---
+        float hy = tableTop;
+        fillRect(cs, left, hy - headH, right - left, headH, HEADER_FILL);
+
+        cellBorder(cs, left, hy - headH, wProgram, headH);
+        textCenterWrap(cs, fb, 8f, UPT_BLUE, left, left + wProgram, hy - 10, "Program\nde lucru");
+
+        for (int d = 0; d < 7; d++) {
+            float cx = left + wProgram + d * wDay;
+            cellBorder(cs, cx, hy - headH, wDay, headH);
+            LocalDate day = weekStart.plusDays(d);
+            boolean inMonth = day.getMonthValue() == timesheet.getMonth();
+            Color dc = inMonth ? UPT_BLUE : MUTED;
+            textCenter(cs, fb, 8.5f, dc, cx, cx + wDay, hy - 12, DAY_NAMES_RO[d]);
+            textCenter(cs, fr, 8f, dc, cx, cx + wDay, hy - 24, day.format(D_DM));
+        }
+
+        float sx = left + wProgram + wDays;
+        cellBorder(cs, sx, hy - headH, wSign, headH);
+        textCenterWrap(cs, fb, 8f, UPT_BLUE, sx, sx + wSign, hy - 10, "Semnătură\ncadru didactic");
+
+        // banda cu numele cadrului
+        hy -= headH;
+        float nameBandH = 16f;
+        fillRect(cs, left, hy - nameBandH, right - left, nameBandH, new Color(0xF3, 0xF6, 0xFB));
+        cellBorder(cs, left, hy - nameBandH, right - left, nameBandH);
+        text(cs, fb, 9f, UPT_BLUE, left + 6, hy - nameBandH + 5, "Cadru didactic:  " + user.getFullName());
+        hy -= nameBandH;
+
+        // --- Rânduri ore ---
+        int[] dayTotals = new int[7];
+        for (int r = 0; r < hourRows; r++) {
+            int h = FIRST_HOUR + r;
+            float ry = hy - r * rowH;
+            String slot = String.format("%02d-%02d", h, h + 1);
+            cellBorder(cs, left, ry - rowH, wProgram, rowH);
+            textCenter(cs, fr, 8.5f, Color.BLACK, left, left + wProgram, ry - rowH + 7, slot);
+
+            for (int d = 0; d < 7; d++) {
+                float cx = left + wProgram + d * wDay;
+                LocalDate day = weekStart.plusDays(d);
+                TimesheetEntry e = findEntry(byDate.get(day), h);
+                if (e != null) {
+                    Color fill = e.getHourType() == HourType.NORMA ? NORMA_FILL : PLATA_FILL;
+                    fillRect(cs, cx, ry - rowH, wDay, rowH, fill);
+                }
+                cellBorder(cs, cx, ry - rowH, wDay, rowH);
+                if (e != null) {
+                    String code = e.getHourType() == HourType.NORMA ? "N" : "P";
+                    Color cc = e.getHourType() == HourType.NORMA ? NORMA_TXT : PLATA_TXT;
+                    textCenter(cs, fb, 8.5f, cc, cx, cx + wDay, ry - rowH + 7, code);
+                    dayTotals[d] += e.getDurationHours();
+                }
+            }
+        }
+
+        // semnătură (celulă mare pe verticală)
+        float gridBottom = hy - hourRows * rowH;
+        cellBorder(cs, sx, gridBottom, wSign, hourRows * rowH);
+
+        // --- Rând total ---
+        float ty = gridBottom;
+        fillRect(cs, left, ty - rowH, wProgram + wDays, rowH, TOTAL_FILL);
+        cellBorder(cs, left, ty - rowH, wProgram, rowH);
+        text(cs, fb, 8.5f, UPT_BLUE, left + 5, ty - rowH + 7, "Total ore:");
+        int weekTotal = 0;
+        for (int d = 0; d < 7; d++) {
+            float cx = left + wProgram + d * wDay;
+            cellBorder(cs, cx, ty - rowH, wDay, rowH);
+            textCenter(cs, fb, 8.5f, UPT_BLUE, cx, cx + wDay, ty - rowH + 7, String.valueOf(dayTotals[d]));
+            weekTotal += dayTotals[d];
+        }
+        cellBorder(cs, sx, ty - rowH, wSign, rowH);
+        textCenter(cs, fb, 8.5f, UPT_BLUE, sx, sx + wSign, ty - rowH + 7, "Σ " + weekTotal + " ore");
+
+        // ====== Legendă + observații ======
+        float belowY = ty - rowH - 18;
+        drawLegend(cs, fr, fb, left, belowY);
+        drawObservatii(cs, fr, fb, left + 290f, belowY, right - (left + 290f));
+
+        // ====== Semnături jos ======
+        text(cs, fr, 9f, Color.BLACK, left, 44, "Semnătură cadru didactic: ______________________");
+        textRight(cs, fr, 9f, Color.BLACK, right, 44, "Data: " + LocalDate.now().format(D_DMY));
+        textRight(cs, fr, 8f, Color.GRAY, right, 28, "Director departament: ______________________");
+    }
+
+    private void drawLegend(PDPageContentStream cs, PDFont fr, PDFont fb, float x, float topY)
+            throws IOException {
+        text(cs, fb, 9f, UPT_BLUE, x, topY, "Legendă");
+        float yy = topY - 16;
+        legendItem(cs, fr, x, yy, NORMA_FILL, NORMA_TXT, "N", "N — oră în normă (activitate didactică din normă)");
+        yy -= 16;
+        legendItem(cs, fr, x, yy, PLATA_FILL, PLATA_TXT, "P", "P — oră în regim de plată cu ora");
+        yy -= 16;
+        text(cs, fr, 7.5f, Color.GRAY, x, yy, "Valorile din rândul „Total ore” = ore lucrate pe zi.");
+    }
+
+    private void legendItem(PDPageContentStream cs, PDFont fr, float x, float y,
+                            Color fill, Color codeColor, String code, String label) throws IOException {
+        fillRect(cs, x, y - 3, 14, 12, fill);
+        cellBorder(cs, x, y - 3, 14, 12);
+        textCenter(cs, fr, 8f, codeColor, x, x + 14, y, code);
+        text(cs, fr, 8f, Color.BLACK, x + 20, y, label);
+    }
+
+    private void drawObservatii(PDPageContentStream cs, PDFont fr, PDFont fb, float x, float topY, float w)
+            throws IOException {
+        text(cs, fb, 9f, UPT_BLUE, x, topY, "Observații");
+        cellBorder(cs, x, topY - 56, w, 50);
+        text(cs, fr, 8f, Color.GRAY, x + 6, topY - 16,
+                "1. Sărbătorile legale și concediile se marchează conform legislației în vigoare.");
+        text(cs, fr, 8f, Color.GRAY, x + 6, topY - 30,
+                "2. Delegațiile (internă / externă) se specifică în prezenta evidență.");
+    }
+
+    // ====================== HELPER GRAFIC ======================
+
+    private void text(PDPageContentStream cs, PDFont font, float size, Color color,
+                      float x, float y, String s) throws IOException {
+        if (s == null) s = "";
+        cs.beginText();
+        cs.setNonStrokingColor(color);
+        cs.setFont(font, size);
+        cs.newLineAtOffset(x, y);
+        cs.showText(s);
+        cs.endText();
+    }
+
+    private void textRight(PDPageContentStream cs, PDFont font, float size, Color color,
+                           float xRight, float y, String s) throws IOException {
+        float w = font.getStringWidth(s) / 1000 * size;
+        text(cs, font, size, color, xRight - w, y, s);
+    }
+
+    private void textCenter(PDPageContentStream cs, PDFont font, float size, Color color,
+                            float x0, float x1, float y, String s) throws IOException {
+        float w = font.getStringWidth(s) / 1000 * size;
+        text(cs, font, size, color, x0 + (x1 - x0 - w) / 2, y, s);
+    }
+
+    private void textCenterWrap(PDPageContentStream cs, PDFont font, float size, Color color,
+                                float x0, float x1, float yTop, String s) throws IOException {
+        String[] lines = s.split("\n");
+        float ly = yTop;
+        for (String line : lines) {
+            textCenter(cs, font, size, color, x0, x1, ly, line);
+            ly -= size + 2;
+        }
+    }
+
+    private void fillRect(PDPageContentStream cs, float x, float y, float w, float h, Color c) throws IOException {
+        cs.setNonStrokingColor(c);
+        cs.addRect(x, y, w, h);
+        cs.fill();
+    }
+
+    private void cellBorder(PDPageContentStream cs, float x, float y, float w, float h) throws IOException {
+        cs.setStrokingColor(GRID);
+        cs.setLineWidth(0.5f);
+        cs.addRect(x, y, w, h);
+        cs.stroke();
+    }
+
+    private TimesheetEntry findEntry(List<TimesheetEntry> dayEntries, int hour) {
+        if (dayEntries == null) return null;
+        for (TimesheetEntry e : dayEntries) {
+            String start = e.getStartTime();
+            if (start != null) {
+                try {
+                    if (Integer.parseInt(start.split(":")[0]) == hour) return e;
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        return null;
+    }
+
+    private String safe(String s) {
+        if (s == null) return "x";
+        return s.toLowerCase().replaceAll("\\s+", "_").replaceAll("[^a-z0-9_]", "");
+    }
+
+    // ====================== MERGE / DOWNLOAD ======================
+
     public byte[] mergePdfs(List<Document> documents) throws IOException {
         if (documents.isEmpty()) {
             throw new BadRequestException("Nu sunt documente de concatenat");
         }
 
-        // Sortează alfabetic după nume
         documents.sort(Comparator.comparing(d -> d.getUser().getLastName()));
 
-        try (PDDocument mergedDoc = new PDDocument()) {
-            boolean hasPages = false;
+        // Folosim PDFMergerUtility — gestionează corect fonturile încorporate (subset),
+        // spre deosebire de importPage care corupe codarea caracterelor la concatenare.
+        PDFMergerUtility merger = new PDFMergerUtility();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        merger.setDestinationStream(baos);
 
-            for (Document doc : documents) {
-                File file = new File(doc.getFilePath());
-                if (!file.exists()) {
-                    log.warn("Fișierul PDF nu există pe disc pentru documentul {} - path: {}", doc.getId(), doc.getFilePath());
-                    continue;
-                }
-
-                try (PDDocument pdf = Loader.loadPDF(file)) {
-                    if (pdf.getNumberOfPages() == 0) {
-                        log.warn("Document PDF fără pagini pentru documentul {} - path: {}", doc.getId(), doc.getFilePath());
-                        continue;
-                    }
-
-                    for (PDPage page : pdf.getPages()) {
-                        mergedDoc.addPage(mergedDoc.importPage(page));
-                        hasPages = true;
-                    }
-                }
+        boolean hasSource = false;
+        for (Document doc : documents) {
+            File file = new File(doc.getFilePath());
+            if (!file.exists()) {
+                log.warn("Fișierul PDF nu există pe disc pentru documentul {} - path: {}", doc.getId(), doc.getFilePath());
+                continue;
             }
-
-            if (!hasPages) {
-                throw new BadRequestException("Nu există pagini valide de concatenat");
-            }
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            mergedDoc.save(baos);
-            return baos.toByteArray();
+            merger.addSource(file);
+            hasSource = true;
         }
+
+        if (!hasSource) {
+            throw new BadRequestException("Nu există pagini valide de concatenat");
+        }
+
+        merger.mergeDocuments(IOUtils.createMemoryOnlyStreamCache());
+        return baos.toByteArray();
     }
 
-    /**
-     * Descarcă un document PDF
-     */
     public byte[] downloadDocument(UUID documentId) throws IOException {
         Document doc = documentRepository.findById(documentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Documentul nu a fost găsit"));
+                .orElseThrow(() -> new ResourceNotFoundException("Documentul nu a fost găsit"));
 
         File file = new File(doc.getFilePath());
         if (!file.exists()) {
@@ -189,236 +419,5 @@ public class PdfGeneratorService {
         }
 
         return Files.readAllBytes(file.toPath());
-    }
-
-    // ========== Helper Methods pentru generare PDF ==========
-
-    private float drawHeader(PDPageContentStream cs, PDType1Font fontBold, PDType1Font fontRegular,
-                            float pageWidth, float y) throws IOException {
-        // Universitatea Politehnica Timișoara
-        cs.beginText();
-        cs.setFont(fontBold, 14);
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("UNIVERSITATEA POLITEHNICA TIMISOARA"));
-        cs.endText();
-
-        y -= 20;
-        cs.beginText();
-        cs.setFont(fontRegular, 10);
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("Piata Victoriei nr. 2, Timisoara 300006, Romania"));
-        cs.endText();
-
-        return y - 40;
-    }
-
-    private float drawTitle(PDPageContentStream cs, PDType1Font fontBold, 
-                           AnnexType annexType, float pageWidth, float y) throws IOException {
-        String rawTitle = annexType.getDisplayName().toUpperCase();
-        String title = sanitizeForPdf(rawTitle);
-        cs.beginText();
-        cs.setFont(fontBold, 12);
-        
-        // Centrează titlul
-        float titleWidth = fontBold.getStringWidth(title) / 1000 * 12;
-        cs.newLineAtOffset((pageWidth - titleWidth) / 2, y);
-        cs.showText(title);
-        cs.endText();
-
-        y -= 15;
-        
-        // Subtitlu
-        String subtitle = sanitizeForPdf(annexType.getFullTitle());
-        cs.beginText();
-        cs.setFont(fontBold, 9);
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(subtitle);
-        cs.endText();
-
-        return y - 30;
-    }
-
-    /**
-     * Înlocuiește caracterele românești care nu pot fi reprezentate în Helvetica/WinAnsi
-     * pentru a evita IllegalArgumentException în PDFBox.
-     */
-    private String sanitizeForPdf(String text) {
-        if (text == null) return "";
-        return text
-            .replace("ă", "a").replace("Ă", "A")
-            .replace("â", "a").replace("Â", "A")
-            .replace("î", "i").replace("Î", "I")
-            .replace("ș", "s").replace("Ș", "S")
-            .replace("ţ", "t").replace("Ţ", "T")
-            .replace("ț", "t").replace("Ț", "T");
-    }
-
-    private float drawUserInfo(PDPageContentStream cs, PDType1Font fontRegular,
-                              User user, Timesheet timesheet, float pageWidth, float y) throws IOException {
-        String[] months = {"", "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-                          "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"};
-
-        String departmentName = "N/A";
-        if (user.getDepartment() != null && Hibernate.isInitialized(user.getDepartment())) {
-            departmentName = user.getDepartment().getName();
-        }
-
-        cs.beginText();
-        cs.setFont(fontRegular, 10);
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("Departament: " + departmentName));
-        cs.endText();
-
-        y -= 15;
-        cs.beginText();
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("Cadru didactic: " + user.getFullName()));
-        cs.endText();
-
-        y -= 15;
-        cs.beginText();
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("Perioada: " + months[timesheet.getMonth()] + " " + timesheet.getYear()));
-        cs.endText();
-
-        return y - 25;
-    }
-
-    private float drawTimesheetTable(PDPageContentStream cs, PDType1Font fontBold, PDType1Font fontRegular,
-                                    Timesheet timesheet, float pageWidth, float y) throws IOException {
-        float tableWidth = pageWidth - 2 * MARGIN;
-        float colWidth = tableWidth / 8; // Prima coloană pentru ore + 7 zile
-
-        // Header tabel
-        float tableY = y;
-        
-        // Prima linie - header cu zilele săptămânii
-        cs.setStrokingColor(0, 0, 0);
-        cs.addRect(MARGIN, tableY - ROW_HEIGHT, tableWidth, ROW_HEIGHT);
-        cs.stroke();
-
-        // Celula "Interval"
-        drawCell(cs, fontBold, "Interval", MARGIN, tableY, colWidth, ROW_HEIGHT, true);
-        
-        // Zile
-        for (int i = 0; i < 7; i++) {
-            drawCell(cs, fontBold, DAYS[i], MARGIN + (i + 1) * colWidth, tableY, colWidth, ROW_HEIGHT, true);
-        }
-
-        tableY -= ROW_HEIGHT;
-
-        // Grupează intrările pe dată și interval
-        Map<String, Map<LocalDate, TimesheetEntry>> entriesBySlotAndDate = new HashMap<>();
-        for (TimesheetEntry entry : timesheet.getEntries()) {
-            entriesBySlotAndDate
-                .computeIfAbsent(entry.getTimeSlot(), k -> new HashMap<>())
-                .put(entry.getEntryDate(), entry);
-        }
-
-        // Rânduri pentru fiecare interval orar
-        for (String slot : TIME_SLOTS) {
-            cs.addRect(MARGIN, tableY - ROW_HEIGHT, tableWidth, ROW_HEIGHT);
-            cs.stroke();
-
-            drawCell(cs, fontRegular, slot, MARGIN, tableY, colWidth, ROW_HEIGHT, false);
-
-            Map<LocalDate, TimesheetEntry> slotEntries = entriesBySlotAndDate.getOrDefault(slot, new HashMap<>());
-            
-            // Pentru fiecare zi din lună, găsește intrarea corespunzătoare
-            for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
-                String cellContent = "";
-                String color = "";
-                
-                // Găsește toate intrările pentru această zi a săptămânii
-                for (Map.Entry<LocalDate, TimesheetEntry> entry : slotEntries.entrySet()) {
-                    if (entry.getKey().getDayOfWeek().getValue() == dayIndex + 1) {
-                        TimesheetEntry te = entry.getValue();
-                        cellContent = te.getHourType() == HourType.NORMA ? "N" : "P";
-                        color = te.getHourType().getColorCode();
-                        break;
-                    }
-                }
-                
-                drawCell(cs, fontRegular, cellContent, MARGIN + (dayIndex + 1) * colWidth, 
-                        tableY, colWidth, ROW_HEIGHT, false);
-            }
-
-            tableY -= ROW_HEIGHT;
-            
-            // Verifică dacă am depășit pagina
-            if (tableY < MARGIN + 100) {
-                break; // În viitor: adaugă pagină nouă
-            }
-        }
-
-        return tableY;
-    }
-
-    private void drawCell(PDPageContentStream cs, PDType1Font font, String text,
-                         float x, float y, float width, float height, boolean header) throws IOException {
-        // Desenează marginile celulei
-        cs.addRect(x, y - height, width, height);
-        cs.stroke();
-
-        // Adaugă text
-        if (text != null && !text.isEmpty()) {
-            text = sanitizeForPdf(text);
-            cs.beginText();
-            cs.setFont(font, header ? 8 : 7);
-            
-            // Centrează textul
-            float textWidth = font.getStringWidth(text) / 1000 * (header ? 8 : 7);
-            float textX = x + (width - textWidth) / 2;
-            float textY = y - height + CELL_PADDING;
-            
-            cs.newLineAtOffset(textX, textY);
-            cs.showText(text);
-            cs.endText();
-        }
-    }
-
-    private void drawFooter(PDPageContentStream cs, PDType1Font fontBold, PDType1Font fontRegular,
-                           Timesheet timesheet, float pageWidth, float y) throws IOException {
-        y -= 30;
-        
-        // Totale
-        cs.beginText();
-        cs.setFont(fontBold, 10);
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("TOTAL ORE:"));
-        cs.endText();
-
-        y -= 15;
-        cs.beginText();
-        cs.setFont(fontRegular, 10);
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("Ore in norma: " + timesheet.getTotalNormaHours()));
-        cs.endText();
-
-        y -= 15;
-        cs.beginText();
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("Ore plata cu ora: " + timesheet.getTotalPlataOraHours()));
-        cs.endText();
-
-        y -= 15;
-        cs.beginText();
-        cs.setFont(fontBold, 10);
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("TOTAL: " + timesheet.getTotalHours() + " ore"));
-        cs.endText();
-
-        // Semnături
-        y -= 40;
-        cs.beginText();
-        cs.setFont(fontRegular, 9);
-        cs.newLineAtOffset(MARGIN, y);
-        cs.showText(sanitizeForPdf("Semnatura cadru didactic: ____________________"));
-        cs.endText();
-
-        cs.beginText();
-        cs.newLineAtOffset(pageWidth / 2, y);
-        cs.showText(sanitizeForPdf("Data: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))));
-        cs.endText();
     }
 }
