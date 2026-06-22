@@ -33,11 +33,16 @@ services:
       DATABASE_USER: pontaje_user
       DATABASE_PASSWORD: ${DB_PASSWORD:-pontaje_pass}
       JWT_SECRET: ${JWT_SECRET:-bXlTdXBlclNlY3JldEtleUZvclByb2R1Y3Rpb24xMjM0NTY3ODkw}
-      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      # Implicit: MailHog (server SMTP local de test). Pentru Gmail real, suprascrie în .env.
+      MAIL_HOST: ${MAIL_HOST:-mailhog}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-pontaje@upt-demo.local}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      REPORT_DEFAULT_RECIPIENT: ${REPORT_DEFAULT_RECIPIENT:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-false}
+      REPORT_DEFAULT_RECIPIENT: ${REPORT_DEFAULT_RECIPIENT:-decanat@upt-demo.local}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173
     volumes:
       - documents_data:/app/documents
@@ -47,6 +52,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - pontaje-network
+
+  # MailHog — server SMTP fals pentru testare (prinde emailurile, UI web pe :8025)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: upt-pontaje-mailhog
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # interfață web
     networks:
       - pontaje-network
 

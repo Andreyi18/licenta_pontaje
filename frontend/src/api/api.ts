@@ -362,4 +362,87 @@ export const notificationsApi = {
   },
 };
 
+// assistant (AI) api
+export interface AssistantMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export const assistantApi = {
+  getConfig: (): Promise<{ enabled: boolean }> => {
+    return apiClient.get<{ enabled: boolean }>("/assistant/config");
+  },
+
+  chat: (messages: AssistantMessage[]): Promise<{ reply: string }> => {
+    return apiClient.post<{ reply: string }>("/assistant/chat", { messages });
+  },
+
+  // streaming token-cu-token (NDJSON). onToken primește fiecare bucată de text.
+  chatStream: async (
+    messages: AssistantMessage[],
+    onToken: (chunk: string) => void,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/assistant/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken && { Authorization: `Bearer ${authToken}` }),
+      },
+      body: JSON.stringify({ messages }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Asistentul nu a putut răspunde (${response.status})`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finished = false; // am primit marcajul {"done":true}
+
+    try {
+      while (!finished) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // procesăm liniile NDJSON complete
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          let obj: any;
+          try {
+            obj = JSON.parse(line);
+          } catch {
+            continue; // linie incompletă/invalidă — o ignorăm
+          }
+          if (obj.t) {
+            onToken(obj.t);
+          } else if (obj.error) {
+            throw new Error(obj.error);
+          } else if (obj.done) {
+            finished = true;
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      // dacă răspunsul a fost deja primit complet, ignorăm erorile de rețea
+      // de la închiderea conexiunii (ex: ERR_INCOMPLETE_CHUNKED_ENCODING)
+      if (!finished) throw err;
+    } finally {
+      // anulăm cititorul ca să nu mai așteptăm chunk-ul final al conexiunii
+      try {
+        await reader.cancel();
+      } catch {
+        /* ignorăm */
+      }
+    }
+  },
+};
+
 export default apiClient;

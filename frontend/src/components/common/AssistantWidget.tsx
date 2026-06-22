@@ -21,12 +21,13 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 import { UserRole } from "../../types";
+import { assistantApi, type AssistantMessage } from "../../api/api";
 
 // ----- tipuri interne -----
 interface QuickAction {
   label: string;
-  path?: string;
-  reply?: string;
+  path?: string; // navighează în aplicație
+  prompt?: string; // trimite o întrebare către AI
 }
 
 interface ChatMessage {
@@ -36,109 +37,29 @@ interface ChatMessage {
   actions?: QuickAction[];
 }
 
-// ----- baza de cunoștințe (reguli de intenție) -----
-interface Intent {
-  keywords: string[];
-  roles?: UserRole[];
-  answer: string;
-  actions?: QuickAction[];
-}
-
-const buildIntents = (role?: UserRole): Intent[] => [
-  {
-    keywords: ["orar", "program", "discipl", "activit", "curs", "laborator"],
-    roles: [UserRole.CADRU_DIDACTIC],
-    answer:
-      "În secțiunea Orar îți poți adăuga și gestiona activitățile săptămânale (curs, laborator, seminar). Disciplina este obligatorie, iar un interval ocupat în aceeași zi este blocat automat.",
-    actions: [{ label: "Deschide Orarul", path: "/schedule" }],
-  },
-  {
-    keywords: ["ponta", "ore", "oră", "trimit", "lună", "luna", "raport propriu"],
-    roles: [UserRole.CADRU_DIDACTIC],
-    answer:
-      "În Pontaj înregistrezi orele lucrate pe zile. Apeși pe o zi, alegi intervalul și tipul orei, apoi adaugi. La final trimiți pontajul lunii spre secretariat pentru aprobare.",
-    actions: [{ label: "Deschide Pontajul", path: "/timesheet" }],
-  },
-  {
-    keywords: ["document", "pdf", "descarc", "generaz", "fișier", "fisier"],
-    roles: [UserRole.CADRU_DIDACTIC],
-    answer:
-      "În Documente poți genera și descărca pontajul lunar în format PDF, gata de semnat.",
-    actions: [{ label: "Deschide Documente", path: "/documents" }],
-  },
-  {
-    keywords: ["centraliz", "aprob", "secretar", "verific", "în așteptare", "asteptare"],
-    roles: [UserRole.SECRETARIAT, UserRole.ADMIN],
-    answer:
-      "În Centralizator vezi toate pontajele trimise de cadrele didactice. Le poți deschide, verifica și aproba, apoi genera raportul centralizat pentru concatenare.",
-    actions: [{ label: "Deschide Centralizatorul", path: "/secretariat" }],
-  },
-  {
-    keywords: ["raport", "trimit raport", "centraliz", "concaten", "export"],
-    roles: [UserRole.SECRETARIAT, UserRole.ADMIN],
-    answer:
-      "Raportul centralizat adună pontajele aprobate într-un singur document. Din Centralizator apeși pe acțiunea de concatenare pentru a genera PDF-ul final pe care îl poți trimite mai departe.",
-    actions: [{ label: "Mergi la Centralizator", path: "/secretariat" }],
-  },
-  {
-    keywords: ["utilizator", "cont", "user", "adaug persoan", "rol", "parol nou"],
-    roles: [UserRole.ADMIN],
-    answer:
-      "Din Utilizatori poți adăuga, edita sau șterge conturi și le poți seta rolul. Câmpurile obligatorii sunt marcate, iar butonul de salvare rămâne blocat până le completezi.",
-    actions: [{ label: "Deschide Utilizatori", path: "/admin/users" }],
-  },
-  {
-    keywords: ["profil", "parol", "schimb parol", "email", "date personale"],
-    answer:
-      "În Profil îți poți actualiza datele personale și schimba parola. Pentru o parolă nouă trebuie să introduci și parola curentă.",
-    actions: [{ label: "Deschide Profilul", path: "/profile" }],
-  },
-  {
-    keywords: ["salut", "buna", "bună", "hei", "hello", "noroc", "servus"],
-    answer: "Salut! Cu ce te pot ajuta astăzi?",
-  },
-  {
-    keywords: ["mulțum", "multum", "mersi", "thanks", "merci"],
-    answer: "Cu plăcere! Dacă mai ai nevoie de ceva, sunt aici. 🙂",
-  },
-  {
-    keywords: ["ajutor", "help", "ce poti", "ce poți", "cum", "nu stiu", "nu știu"],
-    answer:
-      role === UserRole.SECRETARIAT || role === UserRole.ADMIN
-        ? "Te pot ghida prin: Centralizator (verificare/aprobare pontaje), generare raport centralizat și gestionare utilizatori. Alege o acțiune rapidă mai jos."
-        : "Te pot ghida prin: Orar, Pontaj și Documente. Spune-mi ce vrei să faci sau alege o acțiune rapidă mai jos.",
-  },
-];
-
-// sugestii rapide în funcție de rol
+// sugestii rapide (scurtături) în funcție de rol — navigare + întrebări către AI
 const quickSuggestions = (role?: UserRole): QuickAction[] => {
   if (role === UserRole.SECRETARIAT) {
     return [
       { label: "Pontaje în așteptare", path: "/secretariat" },
-      { label: "Cum trimit raportul?", reply: "raport" },
-      { label: "Ajutor", reply: "ajutor" },
+      { label: "Cum trimit raportul pe email?", prompt: "Cum trimit raportul centralizat pe email?" },
+      { label: "Ce poți face?", prompt: "Ce poți face și cu ce mă poți ajuta?" },
     ];
   }
   if (role === UserRole.ADMIN) {
     return [
       { label: "Centralizator", path: "/secretariat" },
       { label: "Utilizatori", path: "/admin/users" },
-      { label: "Ajutor", reply: "ajutor" },
+      { label: "Ce poți face?", prompt: "Ce poți face și cu ce mă poți ajuta?" },
     ];
   }
   return [
     { label: "Adaugă pontaj", path: "/timesheet" },
     { label: "Vezi orarul", path: "/schedule" },
-    { label: "Generează document", path: "/documents" },
-    { label: "Ajutor", reply: "ajutor" },
+    { label: "Cum generez Anexa 1?", prompt: "Cum generez și descarc Anexa 1?" },
+    { label: "Ce poți face?", prompt: "Ce poți face și cu ce mă poți ajuta?" },
   ];
 };
-
-const normalize = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
 
 const AssistantWidget: React.FC = () => {
   const navigate = useNavigate();
@@ -151,9 +72,7 @@ const AssistantWidget: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const idRef = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const intents = useMemo(() => buildIntents(role), [role]);
   const suggestions = useMemo(() => quickSuggestions(role), [role]);
 
   const nextId = () => ++idRef.current;
@@ -166,7 +85,7 @@ const AssistantWidget: React.FC = () => {
         {
           id: nextId(),
           from: "bot",
-          text: `Bună${name}! Sunt asistentul Pontaje UPT. Te pot ajuta să navighezi rapid și să-ți explic funcțiile aplicației. Cu ce începem?`,
+          text: `Bună${name}! Sunt asistentul AI Pontaje UPT. Întreabă-mă orice despre aplicație — orar, pontaj, documente sau rapoarte.`,
           actions: suggestions,
         },
       ]);
@@ -179,82 +98,83 @@ const AssistantWidget: React.FC = () => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  useEffect(
-    () => () => {
-      if (typingTimer.current) clearTimeout(typingTimer.current);
-    },
-    [],
-  );
+  // construiește istoricul pentru API din mesajele afișate
+  const buildHistory = (msgs: ChatMessage[]): AssistantMessage[] =>
+    msgs
+      .filter((m) => m.text && m.text.trim() !== "")
+      .map((m) => ({
+        role: m.from === "user" ? "user" : "assistant",
+        content: m.text,
+      }));
 
-  const findIntent = (text: string): Intent | null => {
-    const n = normalize(text);
-    let best: { intent: Intent; score: number } | null = null;
-    for (const intent of intents) {
-      if (intent.roles && role && !intent.roles.includes(role)) continue;
-      let score = 0;
-      for (const kw of intent.keywords) {
-        if (n.includes(normalize(kw))) score += kw.length;
-      }
-      if (score > 0 && (!best || score > best.score)) best = { intent, score };
-    }
-    return best?.intent ?? null;
-  };
-
-  const pushBotReply = (text: string) => {
-    const intent = findIntent(text);
-    const reply: ChatMessage = intent
-      ? {
-          id: nextId(),
-          from: "bot",
-          text: intent.answer,
-          actions: intent.actions,
-        }
-      : {
-          id: nextId(),
-          from: "bot",
-          text: "Momentan pot răspunde la întrebări despre orar, pontaj, documente, rapoarte și cont. Încearcă una dintre acțiunile rapide de mai jos.",
-          actions: suggestions,
-        };
-
+  const askAI = async (updatedMessages: ChatMessage[]) => {
     setIsTyping(true);
-    typingTimer.current = setTimeout(() => {
+    const botId = nextId();
+    const history = buildHistory(updatedMessages);
+    let started = false;
+    let acc = "";
+    try {
+      await assistantApi.chatStream(history, (chunk) => {
+        acc += chunk;
+        if (!started) {
+          started = true;
+          setIsTyping(false);
+          setMessages((prev) => [...prev, { id: botId, from: "bot", text: acc }]);
+        } else {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === botId ? { ...m, text: acc } : m)),
+          );
+        }
+      });
+    } catch {
+      // Streaming-ul a întâmpinat o eroare.
+      if (started) {
+        // Tokenii au sosit deja → păstrăm răspunsul, fără banner de eroare.
+      } else {
+        // Streaming indisponibil → fallback transparent la varianta non-streaming.
+        try {
+          const res = await assistantApi.chat(history);
+          started = true;
+          setMessages((prev) => [
+            ...prev,
+            { id: botId, from: "bot", text: res.reply },
+          ]);
+        } catch (e: any) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: botId,
+              from: "bot",
+              text:
+                e?.message ||
+                "Asistentul nu a putut răspunde momentan. Încearcă din nou.",
+            },
+          ]);
+        }
+      }
+    } finally {
       setIsTyping(false);
-      setMessages((prev) => [...prev, reply]);
-    }, 550);
+    }
   };
 
   const sendUserMessage = (text: string) => {
     const clean = text.trim();
-    if (!clean) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: nextId(), from: "user", text: clean },
-    ]);
+    if (!clean || isTyping) return;
+    const userMsg: ChatMessage = { id: nextId(), from: "user", text: clean };
+    const updated = [...messages, userMsg];
+    setMessages(updated);
     setInput("");
-    pushBotReply(clean);
+    askAI(updated);
   };
 
   const handleAction = (action: QuickAction) => {
     if (action.path) {
-      setMessages((prev) => [
-        ...prev,
-        { id: nextId(), from: "user", text: action.label },
-        {
-          id: nextId(),
-          from: "bot",
-          text: `Te duc la „${action.label}”…`,
-        },
-      ]);
       navigate(action.path);
       setOpen(false);
       return;
     }
-    if (action.reply) {
-      setMessages((prev) => [
-        ...prev,
-        { id: nextId(), from: "user", text: action.label },
-      ]);
-      pushBotReply(action.reply);
+    if (action.prompt) {
+      sendUserMessage(action.prompt);
     }
   };
 
@@ -262,7 +182,7 @@ const AssistantWidget: React.FC = () => {
     <>
       {/* buton flotant */}
       {!open && (
-        <Tooltip title="Asistent Pontaje" placement="left" arrow>
+        <Tooltip title="Asistent AI" placement="left" arrow>
           <Fab
             color="primary"
             onClick={() => setOpen(true)}
@@ -337,7 +257,7 @@ const AssistantWidget: React.FC = () => {
             </Avatar>
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
-                Asistent Pontaje
+                Asistent AI
               </Typography>
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <Box
@@ -349,7 +269,7 @@ const AssistantWidget: React.FC = () => {
                   }}
                 />
                 <Typography variant="caption" sx={{ opacity: 0.85 }}>
-                  Online · răspunde instant
+                  Online · powered by Groq
                 </Typography>
               </Box>
             </Box>
@@ -370,7 +290,7 @@ const AssistantWidget: React.FC = () => {
               overflowY: "auto",
               px: 1.5,
               py: 2,
-              backgroundColor: "#f4f6fb",
+              backgroundColor: "background.default",
               display: "flex",
               flexDirection: "column",
               gap: 1.25,
@@ -395,16 +315,17 @@ const AssistantWidget: React.FC = () => {
                           ? "14px 14px 4px 14px"
                           : "14px 14px 14px 4px",
                       backgroundColor:
-                        msg.from === "user" ? "primary.main" : "#ffffff",
+                        msg.from === "user" ? "primary.main" : "background.paper",
                       color: msg.from === "user" ? "white" : "text.primary",
                       boxShadow:
                         msg.from === "user"
                           ? "0 4px 12px rgba(0,51,102,0.22)"
-                          : "0 2px 8px rgba(15,35,65,0.07)",
+                          : "0 2px 8px rgba(15,35,65,0.12)",
                       border:
                         msg.from === "bot"
-                          ? "1px solid rgba(15,35,65,0.06)"
+                          ? "1px solid rgba(127,127,127,0.18)"
                           : "none",
+                      whiteSpace: "pre-wrap",
                     }}
                   >
                     <Typography variant="body2" sx={{ lineHeight: 1.5 }}>
@@ -413,7 +334,7 @@ const AssistantWidget: React.FC = () => {
                   </Box>
                 </Box>
 
-                {/* acțiuni atașate mesajului botului */}
+                {/* scurtături atașate mesajului botului */}
                 {msg.actions && msg.actions.length > 0 && (
                   <Box
                     sx={{
@@ -435,7 +356,7 @@ const AssistantWidget: React.FC = () => {
                         sx={{
                           borderColor: "primary.light",
                           color: "primary.main",
-                          backgroundColor: "white",
+                          backgroundColor: "background.paper",
                           "&:hover": {
                             backgroundColor: "primary.main",
                             color: "white",
@@ -456,8 +377,8 @@ const AssistantWidget: React.FC = () => {
                     px: 1.75,
                     py: 1.5,
                     borderRadius: "14px 14px 14px 4px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid rgba(15,35,65,0.06)",
+                    backgroundColor: "background.paper",
+                    border: "1px solid rgba(127,127,127,0.18)",
                     display: "flex",
                     gap: 0.5,
                   }}
@@ -499,7 +420,7 @@ const AssistantWidget: React.FC = () => {
               display: "flex",
               alignItems: "center",
               gap: 1,
-              backgroundColor: "white",
+              backgroundColor: "background.paper",
             }}
           >
             <TextField
@@ -509,6 +430,7 @@ const AssistantWidget: React.FC = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               autoComplete="off"
+              disabled={isTyping}
               sx={{
                 "& .MuiOutlinedInput-root": { borderRadius: 6 },
               }}
@@ -516,7 +438,7 @@ const AssistantWidget: React.FC = () => {
             <IconButton
               type="submit"
               color="primary"
-              disabled={!input.trim()}
+              disabled={!input.trim() || isTyping}
               aria-label="Trimite mesaj"
               sx={{
                 background: input.trim()
@@ -539,8 +461,8 @@ const AssistantWidget: React.FC = () => {
             sx={{
               px: 2,
               py: 0.5,
-              backgroundColor: "white",
-              borderTop: "1px solid rgba(15,35,65,0.05)",
+              backgroundColor: "background.paper",
+              borderTop: "1px solid rgba(127,127,127,0.12)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -549,7 +471,7 @@ const AssistantWidget: React.FC = () => {
           >
             <SparkleIcon sx={{ fontSize: 12, color: "text.disabled" }} />
             <Typography variant="caption" color="text.disabled">
-              Asistent inteligent · Pontaje UPT
+              Asistent AI · Pontaje UPT
             </Typography>
           </Box>
         </Paper>

@@ -12,11 +12,13 @@ import {
   Chip,
   CircularProgress,
   InputAdornment,
+  IconButton,
 } from "@mui/material";
 import {
   Send as SendIcon,
   Email as EmailIcon,
   PictureAsPdf as PdfIcon,
+  Close as CloseIcon,
 } from "@mui/icons-material";
 import toast from "react-hot-toast";
 import { secretariatApi } from "../../api/api";
@@ -113,6 +115,14 @@ const SendReportDialog: React.FC<SendReportDialogProps> = ({
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <EmailIcon color="primary" />
         Trimite raportul pe email
+        <IconButton
+          aria-label="Închide"
+          onClick={onClose}
+          disabled={sending}
+          sx={{ ml: "auto", color: "text.secondary" }}
+        >
+          <CloseIcon />
+        </IconButton>
       </DialogTitle>
       <DialogContent dividers>
         {/* perioada + atașament */}

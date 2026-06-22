@@ -10,3 +10,20 @@ docker-compose up
 Backend: http://localhost:8081
 
 Interfata web: http://localhost:3000
+
+
+# ===== Testare trimitere email (raport secretariat) =====
+# Implicit foloseste MailHog (server SMTP fals de test) - NU trimite emailuri reale.
+# 1. Porneste tot:            docker compose up -d
+# 2. Logheaza-te ca secretariat -> Centralizator -> "Trimite pe email"
+# 3. Vezi emailul trimis (cu PDF-ul atasat) in interfata MailHog:
+MailHog (emailuri de test): http://localhost:8025
+
+# Pentru emailuri REALE prin Gmail, completeaza in fisierul .env:
+#   MAIL_HOST=smtp.gmail.com
+#   MAIL_PORT=587
+#   MAIL_USERNAME=adresa_ta@gmail.com
+#   MAIL_PASSWORD=app_password_de_16_caractere
+#   MAIL_SMTP_AUTH=true
+#   MAIL_SMTP_STARTTLS=true
+# apoi: docker compose up -d backend
