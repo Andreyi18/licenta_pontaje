@@ -33,6 +33,11 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     Optional<Document> findByTimesheetIdAndAnnexType(UUID timesheetId, AnnexType annexType);
 
     /**
+     * Safe variant that returns the first matching document if duplicates exist.
+     */
+    Optional<Document> findFirstByTimesheetIdAndAnnexType(UUID timesheetId, AnnexType annexType);
+
+    /**
      * Găsește documentele pentru o lună și an (pentru secretariat)
      */
     @Query("SELECT d FROM Document d WHERE d.timesheet.month = :month AND d.timesheet.year = :year " +

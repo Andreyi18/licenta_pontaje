@@ -153,11 +153,11 @@ public class SecretariatController {
         }
 
         List<Document> documents = ((departmentId != null)
-                ? documentRepository.findByDepartmentAndPeriod(departmentId, month, year)
-                : documentRepository.findByPeriod(month, year))
-                .stream()
-                .filter(d -> d.getAnnexType() == AnnexType.ANEXA_1)
-                .toList();
+            ? documentRepository.findByDepartmentAndPeriod(departmentId, month, year)
+            : documentRepository.findByPeriod(month, year))
+            .stream()
+            .filter(d -> d.getAnnexType() == AnnexType.ANEXA_1)
+            .collect(java.util.stream.Collectors.toList());
 
         if (documents.isEmpty()) {
             throw new BadRequestException("Nu există documente generate pentru perioada selectată");

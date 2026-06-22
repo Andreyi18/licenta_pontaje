@@ -135,12 +135,12 @@ public class PdfGeneratorService {
         // reutilizăm rândul și suprascriem fișierul cu formatul curent (evităm duplicate
         // și asigurăm că secretariatul primește mereu versiunea nouă).
         Document doc = documentRepository
-                .findByTimesheetIdAndAnnexType(timesheet.getId(), annexType)
-                .orElseGet(() -> Document.builder()
-                        .user(user)
-                        .timesheet(timesheet)
-                        .annexType(annexType)
-                        .build());
+            .findFirstByTimesheetIdAndAnnexType(timesheet.getId(), annexType)
+            .orElseGet(() -> Document.builder()
+                .user(user)
+                .timesheet(timesheet)
+                .annexType(annexType)
+                .build());
         doc.setFilePath(filePath);
         doc.setFileName(fileName);
 
@@ -386,8 +386,9 @@ public class PdfGeneratorService {
         if (documents.isEmpty()) {
             throw new BadRequestException("Nu sunt documente de concatenat");
         }
-
-        documents.sort(Comparator.comparing(d -> d.getUser().getLastName()));
+        // defensive copy to ensure mutability (caller may pass immutable list)
+        List<Document> docs = new ArrayList<>(documents);
+        docs.sort(Comparator.comparing(d -> d.getUser().getLastName()));
 
         // Folosim PDFMergerUtility — gestionează corect fonturile încorporate (subset),
         // spre deosebire de importPage care corupe codarea caracterelor la concatenare.
@@ -396,7 +397,7 @@ public class PdfGeneratorService {
         merger.setDestinationStream(baos);
 
         boolean hasSource = false;
-        for (Document doc : documents) {
+        for (Document doc : docs) {
             File file = new File(doc.getFilePath());
             if (!file.exists()) {
                 log.warn("Fișierul PDF nu există pe disc pentru documentul {} - path: {}", doc.getId(), doc.getFilePath());
