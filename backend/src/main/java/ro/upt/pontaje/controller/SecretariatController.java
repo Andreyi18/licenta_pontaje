@@ -131,40 +131,36 @@ public class SecretariatController {
      * Colectează (sau generează la nevoie) documentele perioadei și le concatenează într-un singur PDF.
      */
     private byte[] buildMergedReport(Integer month, Integer year, UUID departmentId) throws IOException {
-        List<Document> documents;
+        // Regenerăm MEREU Anexa 1 (în formatul curent) pentru pontajele trimise/aprobate,
+        // ca raportul centralizat să reflecte mereu versiunea nouă și datele actuale.
+        List<Timesheet> timesheetsForDocs = timesheetService
+                .findEntitiesByPeriodAndStatuses(month, year,
+                        List.of(TimesheetStatus.SUBMITTED, TimesheetStatus.APPROVED));
 
-        if (departmentId != null) {
-            documents = documentRepository.findByDepartmentAndPeriod(departmentId, month, year);
-        } else {
-            documents = documentRepository.findByPeriod(month, year);
+        if (timesheetsForDocs.isEmpty()) {
+            throw new BadRequestException("Nu există pontaje trimise sau aprobate pentru perioada selectată");
         }
 
-        if (documents.isEmpty()) {
-            // Nu există încă documente – generăm în masă pentru pontajele SUBMITTED/APPROVED
-            List<Timesheet> timesheetsForDocs = timesheetService
-                    .findEntitiesByPeriodAndStatuses(month, year,
-                            List.of(TimesheetStatus.SUBMITTED, TimesheetStatus.APPROVED));
-
-            if (timesheetsForDocs.isEmpty()) {
-                throw new BadRequestException("Nu există pontaje trimise sau aprobate pentru perioada selectată");
-            }
-
-            for (Timesheet t : timesheetsForDocs) {
-                if (!documentRepository.existsByTimesheetIdAndAnnexType(t.getId(), AnnexType.ANEXA_1)) {
-                    pdfGeneratorService.generateAnnex(t, AnnexType.ANEXA_1);
+        for (Timesheet t : timesheetsForDocs) {
+            if (departmentId != null) {
+                // dacă filtrăm pe departament, regenerăm doar pentru cadrele din acel departament
+                if (t.getUser().getDepartment() == null
+                        || !departmentId.equals(t.getUser().getDepartment().getId())) {
+                    continue;
                 }
             }
+            pdfGeneratorService.generateAnnex(t, AnnexType.ANEXA_1);
+        }
 
-            // Reîncărcăm documentele după generare
-            if (departmentId != null) {
-                documents = documentRepository.findByDepartmentAndPeriod(departmentId, month, year);
-            } else {
-                documents = documentRepository.findByPeriod(month, year);
-            }
+        List<Document> documents = ((departmentId != null)
+                ? documentRepository.findByDepartmentAndPeriod(departmentId, month, year)
+                : documentRepository.findByPeriod(month, year))
+                .stream()
+                .filter(d -> d.getAnnexType() == AnnexType.ANEXA_1)
+                .toList();
 
-            if (documents.isEmpty()) {
-                throw new BadRequestException("Nu există documente generate pentru perioada selectată");
-            }
+        if (documents.isEmpty()) {
+            throw new BadRequestException("Nu există documente generate pentru perioada selectată");
         }
 
         return pdfGeneratorService.mergePdfs(documents);

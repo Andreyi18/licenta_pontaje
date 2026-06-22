@@ -131,13 +131,18 @@ public class PdfGeneratorService {
             document.save(filePath);
         }
 
-        Document doc = Document.builder()
-                .user(user)
-                .timesheet(timesheet)
-                .annexType(annexType)
-                .filePath(filePath)
-                .fileName(fileName)
-                .build();
+        // Idempotent: dacă există deja un document pentru (pontaj, tip anexă),
+        // reutilizăm rândul și suprascriem fișierul cu formatul curent (evităm duplicate
+        // și asigurăm că secretariatul primește mereu versiunea nouă).
+        Document doc = documentRepository
+                .findByTimesheetIdAndAnnexType(timesheet.getId(), annexType)
+                .orElseGet(() -> Document.builder()
+                        .user(user)
+                        .timesheet(timesheet)
+                        .annexType(annexType)
+                        .build());
+        doc.setFilePath(filePath);
+        doc.setFileName(fileName);
 
         return documentRepository.save(doc);
     }
