@@ -60,7 +60,7 @@ const SendReportDialog: React.FC<SendReportDialogProps> = ({
     if (!open) return;
     setSubject(`Raport pontaje ${monthName} ${year}`);
     setBody(
-      `Bună ziua,\n\nAtașat regăsiți raportul centralizat al pontajelor pentru luna ${monthName} ${year}.\n\nNumeroase mulțumiri,\nSecretariat`,
+      `Bună ziua,\n\nAtașat regăsiți raportul centralizat al pontajelor pentru luna ${monthName} ${year}.\n\nMulțumiri,\nSecretariat`,
     );
     secretariatApi
       .getEmailConfig()
