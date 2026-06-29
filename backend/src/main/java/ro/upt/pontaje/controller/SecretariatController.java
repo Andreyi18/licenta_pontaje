@@ -152,12 +152,15 @@ public class SecretariatController {
             pdfGeneratorService.generateAnnex(t, AnnexType.ANEXA_1);
         }
 
-        List<Document> documents = ((departmentId != null)
+        // Doar Anexa 1 și câte un singur document per pontaj (siguranță anti-duplicate)
+        java.util.Map<UUID, Document> uniqueByTimesheet = new java.util.LinkedHashMap<>();
+        for (Document d : ((departmentId != null)
                 ? documentRepository.findByDepartmentAndPeriod(departmentId, month, year)
-                : documentRepository.findByPeriod(month, year))
-                .stream()
-                .filter(d -> d.getAnnexType() == AnnexType.ANEXA_1)
-                .toList();
+                : documentRepository.findByPeriod(month, year))) {
+            if (d.getAnnexType() != AnnexType.ANEXA_1) continue;
+            uniqueByTimesheet.putIfAbsent(d.getTimesheet().getId(), d);
+        }
+        List<Document> documents = new java.util.ArrayList<>(uniqueByTimesheet.values());
 
         if (documents.isEmpty()) {
             throw new BadRequestException("Nu există documente generate pentru perioada selectată");

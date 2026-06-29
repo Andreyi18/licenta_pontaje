@@ -33,6 +33,12 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     Optional<Document> findByTimesheetIdAndAnnexType(UUID timesheetId, AnnexType annexType);
 
     /**
+     * Găsește toate documentele pentru (pontaj + tip anexă) — folosit pentru
+     * a curăța eventualele duplicate generate anterior.
+     */
+    List<Document> findAllByTimesheetIdAndAnnexType(UUID timesheetId, AnnexType annexType);
+
+    /**
      * Găsește documentele pentru o lună și an (pentru secretariat)
      */
     @Query("SELECT d FROM Document d WHERE d.timesheet.month = :month AND d.timesheet.year = :year " +
