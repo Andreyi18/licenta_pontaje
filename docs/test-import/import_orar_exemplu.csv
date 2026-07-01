@@ -1,0 +1,10 @@
+Zi,Interval,Disciplina,Sala,TipActivitate
+LUNI,08:00-10:00,Programare Orientată pe Obiecte,A101,CURS
+LUNI,10:00-12:00,Programare Orientată pe Obiecte,B203,LABORATOR
+MARTI,08:00-10:00,Structuri de Date și Algoritmi,A102,CURS
+MARTI,12:00-14:00,Structuri de Date și Algoritmi,B204,SEMINAR
+MIERCURI,10:00-12:00,Baze de Date,A103,CURS
+MIERCURI,14:00-16:00,Baze de Date,C105,LABORATOR
+JOI,08:00-10:00,Sisteme de Operare,A104,CURS
+JOI,10:00-12:00,Sisteme de Operare,B205,LABORATOR
+VINERI,12:00-14:00,Proiect Colectiv,C106,PROIECT
